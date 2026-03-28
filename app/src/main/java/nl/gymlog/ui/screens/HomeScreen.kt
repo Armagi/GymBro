@@ -23,11 +23,14 @@ import nl.gymlog.ui.ALL_METRICS
 import nl.gymlog.ui.MetricDef
 import nl.gymlog.ui.theme.*
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     sessions: List<WorkoutSession>,
     onCapture: () -> Unit,
-    onMetricClick: (String) -> Unit
+    onMetricClick: (String) -> Unit,
+    onSessionEdit: (WorkoutSession) -> Unit,
+    onSessionDelete: (WorkoutSession) -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -39,33 +42,117 @@ fun HomeScreen(
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
+                // ── Header ──────────────────────────────────────────────────
                 item {
-                    Text(
-                        "GymLog",
-                        color = TextPrimary,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 8.dp, top = 16.dp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 20.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "GymBro",
+                                color = TextPrimary,
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                "${sessions.size} sessie${if (sessions.size != 1) "s" else ""} gelogd",
+                                color = TextSecondary,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+
+                // ── Hero cards (latest calories + duration) ─────────────────
+                item {
+                    Spacer(Modifier.height(16.dp))
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        val latest = sessions.first()
+                        HeroCard(
+                            metric = ALL_METRICS[0], // calories
+                            value = ALL_METRICS[0].getValue(latest),
+                            modifier = Modifier.weight(1f)
+                        )
+                        HeroCard(
+                            metric = ALL_METRICS[1], // duration
+                            value = ALL_METRICS[1].getValue(latest),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                // ── Recent sessions ─────────────────────────────────────────
+                item {
+                    Spacer(Modifier.height(8.dp))
+                    SectionHeader("Recente sessies")
+                }
+
+                items(sessions.take(5), key = { it.id }) { session ->
+                    val dismissState = rememberSwipeToDismissBoxState(
+                        confirmValueChange = { value ->
+                            when (value) {
+                                SwipeToDismissBoxValue.StartToEnd -> {
+                                    onSessionEdit(session)
+                                    false // don't dismiss — just trigger edit
+                                }
+                                SwipeToDismissBoxValue.EndToStart -> {
+                                    onSessionDelete(session)
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
                     )
+
+                    // Reset dismiss state after edit swipe so it snaps back
+                    LaunchedEffect(dismissState.currentValue) {
+                        if (dismissState.currentValue == SwipeToDismissBoxValue.StartToEnd) {
+                            dismissState.reset()
+                        }
+                    }
+
+                    SwipeToDismissBox(
+                        state = dismissState,
+                        backgroundContent = { SwipeBackground(dismissState) },
+                        modifier = Modifier.padding(vertical = 3.dp)
+                    ) {
+                        Card(
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = Surface)
+                        ) {
+                            SessionRow(
+                                session = session,
+                                onClick = { onSessionEdit(session) }
+                            )
+                        }
+                    }
                 }
+
+                // ── Metrics ─────────────────────────────────────────────────
                 item {
-                    HighlightRow(sessions)
+                    Spacer(Modifier.height(8.dp))
+                    SectionHeader("Metrics")
                 }
-                item {
-                    Text(
-                        "${sessions.size} sessies gelogd",
-                        color = TextSecondary,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                    )
-                }
+
                 items(ALL_METRICS) { metric ->
-                    MetricCard(metric, sessions, onClick = { onMetricClick(metric.key) })
+                    MetricCard(
+                        metric = metric,
+                        sessions = sessions,
+                        onClick = { onMetricClick(metric.key) }
+                    )
+                    Spacer(Modifier.height(8.dp))
                 }
-                item { Spacer(Modifier.height(80.dp)) }
+
+                item { Spacer(Modifier.height(88.dp)) }
             }
         }
 
@@ -81,39 +168,7 @@ fun HomeScreen(
     }
 }
 
-@Composable
-fun HighlightRow(sessions: List<WorkoutSession>) {
-    val latest = sessions.firstOrNull() ?: return
-    val highlights = listOf(
-        ALL_METRICS[0], // calories
-        ALL_METRICS[5], // avgHeartRate
-        ALL_METRICS[9]  // moves
-    )
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        highlights.forEach { metric ->
-            val value = metric.getValue(latest)
-            Card(
-                modifier = Modifier.weight(1f),
-                shape = RoundedCornerShape(16.dp),
-                colors = CardDefaults.cardColors(containerColor = Surface)
-            ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(metric.label, color = TextSecondary, fontSize = 11.sp)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        if (value != null) metric.formatValue(value) else "--",
-                        color = metric.color,
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    if (metric.unit.isNotEmpty()) {
-                        Text(metric.unit, color = TextSecondary, fontSize = 10.sp)
-                    }
-                }
-            }
-        }
-    }
-}
+// ─── Metric card (with mini sparkline) ───────────────────────────────────────
 
 @Composable
 fun MetricCard(
@@ -125,6 +180,8 @@ fun MetricCard(
     val previous = sessions.getOrNull(1)
     val latestVal = latest?.let { metric.getValue(it) }
     val prevVal = previous?.let { metric.getValue(it) }
+    val sparkValues = sessions.takeLast(8).reversed()
+        .mapNotNull { metric.getValue(it) }
 
     val trend = when {
         latestVal == null || prevVal == null -> 0
@@ -132,6 +189,7 @@ fun MetricCard(
         latestVal < prevVal -> -1
         else -> 0
     }
+    val delta = if (latestVal != null && prevVal != null) latestVal - prevVal else null
 
     Card(
         modifier = Modifier
@@ -143,41 +201,68 @@ fun MetricCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp, 40.dp)
-                    .background(metric.color, RoundedCornerShape(2.dp))
-            )
-            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(metric.label, color = TextSecondary, fontSize = 12.sp)
                 Text(
-                    if (latestVal != null) "${metric.formatValue(latestVal)} ${metric.unit}".trim()
-                    else "--",
-                    color = TextPrimary,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold
+                    metric.label.uppercase(),
+                    color = TextSecondary,
+                    fontSize = 10.sp,
+                    letterSpacing = 0.8.sp,
+                    fontWeight = FontWeight.Medium
+                )
+                Spacer(Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(
+                        if (latestVal != null) metric.formatValue(latestVal) else "--",
+                        color = if (latestVal != null) TextPrimary else TextSecondary,
+                        fontSize = 24.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (metric.unit.isNotEmpty()) {
+                        Text(
+                            " ${metric.unit}",
+                            color = metric.color,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(bottom = 3.dp)
+                        )
+                    }
+                }
+                if (delta != null) {
+                    val deltaColor = if (delta >= 0f) AccentCondition else AccentAvgHR
+                    val deltaStr = "${if (delta >= 0f) "+" else ""}${metric.formatValue(delta)}"
+                    Text(deltaStr, color = deltaColor, fontSize = 12.sp)
+                }
+            }
+
+            Column(horizontalAlignment = Alignment.End) {
+                Icon(
+                    imageVector = when (trend) {
+                        1 -> Icons.Default.TrendingUp
+                        -1 -> Icons.Default.TrendingDown
+                        else -> Icons.Default.TrendingFlat
+                    },
+                    contentDescription = null,
+                    tint = when (trend) {
+                        1 -> AccentCondition
+                        -1 -> AccentAvgHR
+                        else -> TextSecondary
+                    },
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.height(8.dp))
+                MiniSparkline(
+                    values = sparkValues,
+                    color = metric.color,
+                    modifier = Modifier.size(width = 64.dp, height = 28.dp)
                 )
             }
-            Icon(
-                imageVector = when (trend) {
-                    1 -> Icons.Default.TrendingUp
-                    -1 -> Icons.Default.TrendingDown
-                    else -> Icons.Default.TrendingFlat
-                },
-                contentDescription = null,
-                tint = when (trend) {
-                    1 -> AccentCondition
-                    -1 -> AccentAvgHR
-                    else -> TextSecondary
-                }
-            )
         }
     }
 }
+
+// ─── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
 fun EmptyState(onCapture: () -> Unit) {
@@ -186,9 +271,9 @@ fun EmptyState(onCapture: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        Text("GymLog", color = TextPrimary, fontSize = 32.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(16.dp))
-        Text("Nog geen sessies.", color = TextSecondary, fontSize = 16.sp)
+        Text("GymBro", color = TextPrimary, fontSize = 32.sp, fontWeight = FontWeight.Bold)
+        Spacer(Modifier.height(8.dp))
+        Text("Track je Technogym workouts.", color = TextSecondary, fontSize = 16.sp)
         Spacer(Modifier.height(24.dp))
         Button(
             onClick = onCapture,
