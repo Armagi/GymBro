@@ -1,8 +1,8 @@
 package nl.gymlog.ui.screens
 
 import android.Manifest
-import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.*
@@ -13,6 +13,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Photo
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -25,24 +27,31 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import nl.gymlog.ui.theme.Background
-import nl.gymlog.ui.theme.TextSecondary
 import java.io.File
 import java.util.concurrent.Executors
 
 @Composable
-fun CaptureScreen(onPhotoCaptured: (String) -> Unit, onBack: () -> Unit) {
+fun CaptureScreen(
+    onPhotoCaptured: (String) -> Unit,
+    onGalleryImagePicked: (Uri) -> Unit,
+    onBack: () -> Unit
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
 
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         hasCameraPermission = it
     }
 
+    val galleryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        uri?.let { onGalleryImagePicked(it) }
+    }
+
     LaunchedEffect(Unit) {
-        if (!hasCameraPermission) launcher.launch(Manifest.permission.CAMERA)
+        if (!hasCameraPermission) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
     val imageCapture = remember { ImageCapture.Builder().build() }
@@ -85,7 +94,23 @@ fun CaptureScreen(onPhotoCaptured: (String) -> Unit, onBack: () -> Unit) {
             )
         }
 
-        // Shutter button
+        // Gallery button (bottom-left, mirrors iOS camera layout)
+        IconButton(
+            onClick = { galleryLauncher.launch("image/*") },
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .padding(bottom = 56.dp, start = 40.dp)
+                .size(56.dp)
+        ) {
+            Icon(
+                Icons.Default.Photo,
+                contentDescription = "Uit galerij kiezen",
+                tint = Color.White,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        // Shutter button (bottom-center)
         Button(
             onClick = {
                 val file = File(context.cacheDir, "gymlog_${System.currentTimeMillis()}.jpg")
