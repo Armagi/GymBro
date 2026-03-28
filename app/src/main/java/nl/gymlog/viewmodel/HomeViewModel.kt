@@ -18,4 +18,5 @@ class HomeViewModel(app: Application) : AndroidViewModel(app) {
     )
 
     fun delete(session: WorkoutSession) = viewModelScope.launch { repo.delete(session) }
+    fun update(session: WorkoutSession) = viewModelScope.launch { repo.update(session) }
 }

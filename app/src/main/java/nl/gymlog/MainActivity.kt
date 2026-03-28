@@ -28,42 +28,73 @@ class MainActivity : ComponentActivity() {
                 val sessions by homeVm.sessions.collectAsStateWithLifecycle()
                 val parsed by captureVm.parsed.collectAsStateWithLifecycle()
                 val isProcessing by captureVm.isProcessing.collectAsStateWithLifecycle()
+                val pendingDate by captureVm.pendingDate.collectAsStateWithLifecycle()
 
                 NavHost(navController, startDestination = "home") {
+
                     composable("home") {
                         HomeScreen(
                             sessions = sessions,
                             onCapture = { navController.navigate("capture") },
-                            onMetricClick = { key -> navController.navigate("detail/$key") }
+                            onMetricClick = { key -> navController.navigate("detail/$key") },
+                            onSessionEdit = { session -> navController.navigate("edit/${session.id}") },
+                            onSessionDelete = { session -> homeVm.delete(session) }
                         )
                     }
+
                     composable("capture") {
-                        if (isProcessing) {
-                            LoadingScreen()
-                        } else if (parsed != null) {
-                            ReviewScreen(
+                        when {
+                            isProcessing -> LoadingScreen()
+                            parsed != null -> ReviewScreen(
                                 parsed = parsed!!,
+                                existingSession = null,
+                                initialDate = pendingDate,
                                 onSave = { session ->
                                     captureVm.saveSession(session)
                                     navController.navigate("home") {
                                         popUpTo("home") { inclusive = true }
                                     }
                                 },
-                                onRetake = { captureVm.processPhoto(""); navController.navigate("capture") }
+                                onUpdate = {},
+                                onRetake = {
+                                    captureVm.reset()
+                                    navController.navigate("capture") {
+                                        popUpTo("capture") { inclusive = true }
+                                    }
+                                }
                             )
-                        } else {
-                            CaptureScreen(
+                            else -> CaptureScreen(
                                 onPhotoCaptured = { path -> captureVm.processPhoto(path) },
+                                onGalleryImagePicked = { uri -> captureVm.processGalleryUri(uri) },
                                 onBack = { navController.popBackStack() }
                             )
                         }
                     }
+
                     composable("detail/{metricKey}") { backStack ->
                         val key = backStack.arguments?.getString("metricKey") ?: return@composable
                         DetailScreen(
                             metricKey = key,
                             sessions = sessions,
                             onBack = { navController.popBackStack() }
+                        )
+                    }
+
+                    composable("edit/{sessionId}") { backStack ->
+                        val sessionId = backStack.arguments?.getString("sessionId")?.toIntOrNull()
+                            ?: return@composable
+                        // Reactive lookup — avoids null on cold start
+                        val session = sessions.find { it.id == sessionId } ?: return@composable
+                        ReviewScreen(
+                            parsed = null,
+                            existingSession = session,
+                            initialDate = session.date,
+                            onSave = {},
+                            onUpdate = { updated ->
+                                homeVm.update(updated)
+                                navController.popBackStack()
+                            },
+                            onRetake = { navController.popBackStack() }
                         )
                     }
                 }
