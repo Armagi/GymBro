@@ -68,6 +68,9 @@ dependencies {
     // ML Kit OCR
     implementation("com.google.mlkit:text-recognition:16.0.0")
 
+    // EXIF for reading photo capture date
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+
     // Charts
     implementation("com.patrykandpatrick.vico:compose-m3:1.13.1")
 

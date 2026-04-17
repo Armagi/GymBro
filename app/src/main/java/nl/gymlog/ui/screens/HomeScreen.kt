@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddAPhoto
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.TrendingDown
 import androidx.compose.material.icons.filled.TrendingFlat
 import androidx.compose.material.icons.filled.TrendingUp
@@ -28,6 +29,7 @@ import nl.gymlog.ui.theme.*
 fun HomeScreen(
     sessions: List<WorkoutSession>,
     onCapture: () -> Unit,
+    onBulkImport: () -> Unit,
     onMetricClick: (String) -> Unit,
     onSessionEdit: (WorkoutSession) -> Unit,
     onSessionDelete: (WorkoutSession) -> Unit
@@ -38,7 +40,7 @@ fun HomeScreen(
             .background(Background)
     ) {
         if (sessions.isEmpty()) {
-            EmptyState(onCapture)
+            EmptyState(onCapture, onBulkImport)
         } else {
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
@@ -64,6 +66,13 @@ fun HomeScreen(
                                 "${sessions.size} sessie${if (sessions.size != 1) "s" else ""} gelogd",
                                 color = TextSecondary,
                                 fontSize = 13.sp
+                            )
+                        }
+                        IconButton(onClick = onBulkImport) {
+                            Icon(
+                                Icons.Default.PhotoLibrary,
+                                contentDescription = "Importeer uit galerij",
+                                tint = TextSecondary
                             )
                         }
                     }
@@ -265,7 +274,7 @@ fun MetricCard(
 // ─── Empty state ──────────────────────────────────────────────────────────────
 
 @Composable
-fun EmptyState(onCapture: () -> Unit) {
+fun EmptyState(onCapture: () -> Unit, onBulkImport: () -> Unit) {
     Column(
         modifier = Modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -280,6 +289,10 @@ fun EmptyState(onCapture: () -> Unit) {
             colors = ButtonDefaults.buttonColors(containerColor = AccentCalories)
         ) {
             Text("Maak je eerste foto", color = Color.White)
+        }
+        Spacer(Modifier.height(12.dp))
+        TextButton(onClick = onBulkImport) {
+            Text("Of importeer uit galerij", color = TextSecondary)
         }
     }
 }

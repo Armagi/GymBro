@@ -13,12 +13,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import nl.gymlog.ui.screens.*
 import nl.gymlog.ui.theme.GymLogTheme
+import nl.gymlog.viewmodel.BulkImportViewModel
 import nl.gymlog.viewmodel.CaptureViewModel
 import nl.gymlog.viewmodel.HomeViewModel
 
 class MainActivity : ComponentActivity() {
     private val homeVm: HomeViewModel by viewModels()
     private val captureVm: CaptureViewModel by viewModels()
+    private val bulkVm: BulkImportViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -30,12 +32,20 @@ class MainActivity : ComponentActivity() {
                 val isProcessing by captureVm.isProcessing.collectAsStateWithLifecycle()
                 val pendingDate by captureVm.pendingDate.collectAsStateWithLifecycle()
 
+                val bulkRunning by bulkVm.isRunning.collectAsStateWithLifecycle()
+                val bulkProcessed by bulkVm.processed.collectAsStateWithLifecycle()
+                val bulkTotal by bulkVm.total.collectAsStateWithLifecycle()
+                val bulkImported by bulkVm.imported.collectAsStateWithLifecycle()
+                val bulkFailed by bulkVm.failed.collectAsStateWithLifecycle()
+                val bulkDone by bulkVm.done.collectAsStateWithLifecycle()
+
                 NavHost(navController, startDestination = "home") {
 
                     composable("home") {
                         HomeScreen(
                             sessions = sessions,
                             onCapture = { navController.navigate("capture") },
+                            onBulkImport = { navController.navigate("bulkImport") },
                             onMetricClick = { key -> navController.navigate("detail/$key") },
                             onSessionEdit = { session -> navController.navigate("edit/${session.id}") },
                             onSessionDelete = { session -> homeVm.delete(session) }
@@ -69,6 +79,20 @@ class MainActivity : ComponentActivity() {
                                 onBack = { navController.popBackStack() }
                             )
                         }
+                    }
+
+                    composable("bulkImport") {
+                        BulkImportScreen(
+                            isRunning = bulkRunning,
+                            processed = bulkProcessed,
+                            total = bulkTotal,
+                            imported = bulkImported,
+                            failed = bulkFailed,
+                            done = bulkDone,
+                            onPicked = { uris -> bulkVm.importImages(uris) },
+                            onBack = { navController.popBackStack() },
+                            onReset = { bulkVm.reset() }
+                        )
                     }
 
                     composable("detail/{metricKey}") { backStack ->
